@@ -38,18 +38,6 @@ In command mode, you can type:
 - `zone Addis Ababa`
 - `ringtone bell`
 
-## Running locally
-
-```bash
-npm install
-npm run dev
-```
-
-To build for production:
-
-```bash
-npm run build
-```
 
 ## Note
 
