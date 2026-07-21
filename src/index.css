@@ -1,0 +1,56 @@
+@import url('https://fonts.googleapis.com/css2?family=Adwaita+Mono:wght@400;700&display=swap');
+
+:root {
+  font-family: 'Adwaita Mono', 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  --primary-color: #cba6f7;
+  --secondary-color: #1e1e2e;
+  --accent-color: #89b4fa;
+  --text-color: #cdd6f4;
+  --heading-color: #f5e0dc;
+  --card-bg: #313244;
+  --border-color: #585b70;
+  --gradient-start: #181825;
+  --gradient-end: #313244;
+  --surface-soft: #45475a;
+  --overlay-color: #6c7086;
+  --success-color: #a6e3a1;
+  --warning-color: #f9e2af;
+  --danger-color: #f38ba8;
+  color: var(--text-color);
+  background: var(--secondary-color);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: var(--secondary-color);
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  color: inherit;
+}
+
+#root {
+  min-height: 100vh;
+}

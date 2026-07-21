@@ -1,0 +1,55 @@
+<svg width="1920" height="1080" viewBox="0 0 1920 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1920" y2="1080" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#02040B"/>
+      <stop offset="0.55" stop-color="#050B17"/>
+      <stop offset="1" stop-color="#02030A"/>
+    </linearGradient>
+    <radialGradient id="glow1" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(620 240) rotate(90) scale(520 620)">
+      <stop stop-color="#89B4FA" stop-opacity="0.68"/>
+      <stop offset="1" stop-color="#67E8F9" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow2" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1420 320) rotate(90) scale(500 560)">
+      <stop stop-color="#CBA6F7" stop-opacity="0.6"/>
+      <stop offset="1" stop-color="#CBA6F7" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow3" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(980 860) rotate(90) scale(420 620)">
+      <stop stop-color="#A6E3A1" stop-opacity="0.24"/>
+      <stop offset="1" stop-color="#A6E3A1" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="grid" x1="0" y1="0" x2="0" y2="1080" gradientUnits="userSpaceOnUse">
+      <stop stop-color="white" stop-opacity="0.14"/>
+      <stop offset="1" stop-color="white" stop-opacity="0.02"/>
+    </linearGradient>
+    <filter id="blur" x="-100" y="-100" width="2120" height="1280" filterUnits="userSpaceOnUse">
+      <feGaussianBlur stdDeviation="60"/>
+    </filter>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+  <g filter="url(#blur)">
+    <circle cx="620" cy="240" r="420" fill="url(#glow1)"/>
+    <circle cx="1420" cy="320" r="380" fill="url(#glow2)"/>
+    <circle cx="980" cy="860" r="360" fill="url(#glow3)"/>
+  </g>
+  <g opacity="0.18">
+    <path d="M0 180H1920" stroke="url(#grid)"/>
+    <path d="M0 360H1920" stroke="url(#grid)"/>
+    <path d="M0 540H1920" stroke="url(#grid)"/>
+    <path d="M0 720H1920" stroke="url(#grid)"/>
+    <path d="M0 900H1920" stroke="url(#grid)"/>
+    <path d="M240 0V1080" stroke="url(#grid)"/>
+    <path d="M480 0V1080" stroke="url(#grid)"/>
+    <path d="M720 0V1080" stroke="url(#grid)"/>
+    <path d="M960 0V1080" stroke="url(#grid)"/>
+    <path d="M1200 0V1080" stroke="url(#grid)"/>
+    <path d="M1440 0V1080" stroke="url(#grid)"/>
+    <path d="M1680 0V1080" stroke="url(#grid)"/>
+  </g>
+  <g opacity="0.8">
+    <circle cx="1540" cy="160" r="6" fill="#F5E0DC"/>
+    <circle cx="1620" cy="220" r="3" fill="#89DCEB"/>
+    <circle cx="1400" cy="180" r="4" fill="#CBA6F7"/>
+    <circle cx="520" cy="880" r="5" fill="#A6E3A1"/>
+    <circle cx="620" cy="780" r="3" fill="#F5E0DC"/>
+  </g>
+</svg>

@@ -1,0 +1,41 @@
+<svg width="1920" height="1080" viewBox="0 0 1920 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1920" y2="1080" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#11111B"/>
+      <stop offset="0.5" stop-color="#181825"/>
+      <stop offset="1" stop-color="#1E1E2E"/>
+    </linearGradient>
+    <radialGradient id="green" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1280 260) rotate(90) scale(420 500)">
+      <stop stop-color="#A6E3A1" stop-opacity="0.36"/>
+      <stop offset="1" stop-color="#A6E3A1" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="blue" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(520 820) rotate(90) scale(340 420)">
+      <stop stop-color="#89B4FA" stop-opacity="0.3"/>
+      <stop offset="1" stop-color="#89B4FA" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="80" height="80" patternUnits="userSpaceOnUse">
+      <path d="M80 0H0V80" stroke="white" stroke-opacity="0.06" stroke-width="1"/>
+    </pattern>
+    <filter id="blur" x="-100" y="-100" width="2120" height="1280" filterUnits="userSpaceOnUse">
+      <feGaussianBlur stdDeviation="52"/>
+    </filter>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+  <rect width="1920" height="1080" fill="url(#grid)"/>
+  <g filter="url(#blur)">
+    <circle cx="1280" cy="260" r="420" fill="url(#green)"/>
+    <circle cx="520" cy="820" r="320" fill="url(#blue)"/>
+  </g>
+  <g opacity="0.18">
+    <path d="M0 540H1920" stroke="#89B4FA" stroke-opacity="0.14"/>
+    <path d="M960 0V1080" stroke="#CBA6F7" stroke-opacity="0.14"/>
+    <path d="M0 0L1920 1080" stroke="#89B4FA" stroke-opacity="0.08"/>
+    <path d="M1920 0L0 1080" stroke="#A6E3A1" stroke-opacity="0.08"/>
+  </g>
+  <g opacity="0.2">
+    <circle cx="1740" cy="180" r="4" fill="#F5E0DC"/>
+    <circle cx="1540" cy="240" r="2.5" fill="#F5C2E7"/>
+    <circle cx="260" cy="900" r="4" fill="#F5E0DC"/>
+    <circle cx="420" cy="820" r="2.5" fill="#89DCEB"/>
+  </g>
+</svg>
