@@ -1,6 +1,15 @@
 const PRECACHE_NAME = 'clock-precache-v1'
 const RUNTIME_CACHE_NAME = 'clock-runtime-v1'
-const PRECACHE_URLS = ['/', '/index.html', '/offline.html', '/manifest.webmanifest', '/favicon.svg']
+const PRECACHE_URLS = [
+  '/',
+  '/index.html',
+  '/offline.html',
+  '/manifest.webmanifest',
+  '/favicon.ico',
+  '/favicon.svg',
+  '/favicon-32.png',
+  '/favicon-192.png',
+]
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
