@@ -43,3 +43,4 @@ In command mode, you can type:
 
 The app remembers your last settings in the browser, so it should feel the same the next time you open it.
 
+Support Me: https://www.gurshaplus.com/mrmishaal

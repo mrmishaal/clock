@@ -1025,6 +1025,15 @@ function App() {
         )}
       </section>
 
+      <a
+        className="developer-support"
+        href="https://www.gurshaplus.com/mrmishaal"
+        target="_blank"
+        rel="noreferrer"
+      >
+        Support the Developer
+      </a>
+
       {view === 'binary' && (
         <div className="display__note">
           {(mode === 'timer' || mode === 'pomodoro' || mode === 'stopwatch') && (

@@ -178,6 +178,26 @@
   cursor: pointer;
 }
 
+.developer-support {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  z-index: 3;
+  transform: translateX(-50%);
+  color: var(--overlay-color);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  opacity: 0.7;
+}
+
+.developer-support:hover,
+.developer-support:focus-visible {
+  color: var(--text-color);
+  opacity: 1;
+  text-decoration: underline;
+}
+
 .commandbar {
   position: fixed;
   left: 50%;
