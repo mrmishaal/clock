@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#11111b" />
+    <title>Offline · clock.mrmishaal.org</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #11111b;
+        --surface: #1e1e2e;
+        --card: #313244;
+        --text: #cdd6f4;
+        --muted: #6c7086;
+        --accent: #cba6f7;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: var(--bg);
+        color: var(--text);
+        font-family: 'Adwaita Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      }
+
+      body {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+      }
+
+      .card {
+        width: min(640px, 100%);
+        padding: 28px;
+        border: 1px solid rgba(203, 166, 247, 0.28);
+        border-radius: 24px;
+        background: linear-gradient(180deg, rgba(49, 50, 68, 0.96), rgba(30, 30, 46, 0.98));
+        box-shadow: 0 30px 90px rgba(0, 0, 0, 0.35);
+      }
+
+      h1 {
+        margin: 0 0 12px;
+        font-size: clamp(2rem, 5vw, 3rem);
+        color: #f5e0dc;
+      }
+
+      p {
+        margin: 0 0 10px;
+        color: var(--text);
+        line-height: 1.7;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 18px;
+        padding: 0.55rem 0.85rem;
+        border: 1px solid rgba(137, 180, 250, 0.25);
+        border-radius: 999px;
+        background: rgba(137, 180, 250, 0.08);
+        color: #89b4fa;
+      }
+    </style>
+  </head>
+  <body>
+    <section class="card">
+      <h1>You’re offline</h1>
+      <p>The clock app is still here, but the network is not.</p>
+      <p class="muted">
+        Once you reconnect, refresh the page and your saved settings should come back.
+      </p>
+      <div class="badge">clock.mrmishaal.org</div>
+    </section>
+  </body>
+</html>

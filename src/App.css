@@ -67,6 +67,43 @@
   text-transform: uppercase;
 }
 
+.display__status {
+  color: var(--accent-color);
+  font-size: 0.95rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.display__hint {
+  color: var(--overlay-color);
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+}
+
+.display__hint kbd {
+  display: inline-block;
+  padding: 0.08rem 0.42rem;
+  margin: 0 0.2rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-color);
+  background: rgba(30, 30, 46, 0.42);
+  color: var(--text-color);
+  font: inherit;
+}
+
+.display__note {
+  position: fixed;
+  left: 50%;
+  bottom: 92px;
+  transform: translateX(-50%);
+  z-index: 22;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  text-align: center;
+  pointer-events: none;
+}
+
 .binary {
   display: grid;
   gap: 18px;
@@ -265,6 +302,65 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.commandline {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  display: grid;
+  gap: 6px;
+  padding: 10px 16px 12px;
+  background: rgba(17, 17, 27, 0.94);
+  border-top: 1px solid var(--border-color);
+}
+
+.commandline__line {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.commandline__prompt {
+  color: var(--primary-color);
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.commandline__input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-color);
+  padding: 0;
+  caret-color: var(--primary-color);
+}
+
+.commandline__help {
+  color: var(--overlay-color);
+  font-size: 0.82rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.commandline__help kbd {
+  display: inline-block;
+  padding: 0.08rem 0.42rem;
+  margin: 0 0.2rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-color);
+  background: rgba(30, 30, 46, 0.42);
+  color: var(--text-color);
+  font: inherit;
+}
+
 .background-tile {
   display: grid;
   gap: 8px;
@@ -284,6 +380,33 @@
 .background-tile span {
   font-size: 0.82rem;
   letter-spacing: 0.04em;
+}
+
+.duration-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+.field-note {
+  color: var(--overlay-color);
+  font-size: 0.82rem;
+}
+
+.field-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.ringtone-preview {
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-color);
+  cursor: pointer;
+  padding: 0.7rem 0.85rem;
+  color: var(--accent-color);
 }
 
 .mini-controls {
@@ -326,6 +449,10 @@
     grid-template-columns: 1fr;
   }
 
+  .duration-grid {
+    grid-template-columns: 1fr;
+  }
+
   .field {
     min-width: 0;
   }
@@ -338,5 +465,9 @@
   .binary__cell {
     min-height: 42px;
     font-size: 1.1rem;
+  }
+
+  .commandline__help {
+    white-space: normal;
   }
 }

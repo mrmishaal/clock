@@ -1,13 +1,14 @@
-@import url('https://fonts.googleapis.com/css2?family=Adwaita+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Adwaita+Mono:wght@400;700&family=IBM+Plex+Mono:wght@400;700&family=JetBrains+Mono:wght@400;700&family=Source+Code+Pro:wght@400;700&display=swap');
 
 :root {
-  font-family: 'Adwaita Mono', 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--mono-font);
   line-height: 1.5;
   font-weight: 400;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  --mono-font: 'Adwaita Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --primary-color: #cba6f7;
   --secondary-color: #1e1e2e;
   --accent-color: #89b4fa;
@@ -24,6 +25,39 @@
   --danger-color: #f38ba8;
   color: var(--text-color);
   background: var(--secondary-color);
+}
+
+:root[data-theme='latte'] {
+  --primary-color: #8839ef;
+  --secondary-color: #eff1f5;
+  --accent-color: #1e66f5;
+  --text-color: #4c4f69;
+  --heading-color: #1e1e2e;
+  --card-bg: #ffffff;
+  --border-color: #bcc0cc;
+  --gradient-start: #eff1f5;
+  --gradient-end: #dce0e8;
+  --surface-soft: #e6e9ef;
+  --overlay-color: #6c6f85;
+  --success-color: #40a02b;
+  --warning-color: #df8e1d;
+  --danger-color: #d20f39;
+}
+
+:root[data-mono-font='adwaita'] {
+  --mono-font: 'Adwaita Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+:root[data-mono-font='ibm'] {
+  --mono-font: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+:root[data-mono-font='jetbrains'] {
+  --mono-font: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+:root[data-mono-font='source'] {
+  --mono-font: 'Source Code Pro', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 * {

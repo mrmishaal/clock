@@ -1,0 +1,18 @@
+{
+  "name": "clock.mrmishaal.org",
+  "short_name": "Clock",
+  "description": "A fast clock, Pomodoro timer, countdown timer, stopwatch, and world clock dashboard.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#11111b",
+  "theme_color": "#11111b",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

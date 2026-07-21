@@ -1,9 +1,21 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 
-type Mode = 'clock' | 'timer' | 'stopwatch'
+type Mode = 'clock' | 'pomodoro' | 'timer' | 'stopwatch'
 type View = 'digital' | 'binary'
 type Theme = 'mocha' | 'latte'
+type MonoFont = 'adwaita' | 'ibm' | 'jetbrains' | 'source'
+type PomodoroPhase = 'focus' | 'break'
+type Ringtone =
+  | 'chime'
+  | 'bell'
+  | 'alarm'
+  | 'long-alarm'
+  | 'soft'
+  | 'retro'
+  | 'sonar'
+  | 'pulse'
+  | 'digital'
 type Background =
   | 'space'
   | '1363709'
@@ -20,8 +32,31 @@ type Background =
 
 const ZONES = [
   { label: 'Addis Ababa', value: 'Africa/Addis_Ababa' },
+  { label: 'Cairo', value: 'Africa/Cairo' },
+  { label: 'Johannesburg', value: 'Africa/Johannesburg' },
+  { label: 'Lagos', value: 'Africa/Lagos' },
+  { label: 'Casablanca', value: 'Africa/Casablanca' },
   { label: 'UTC', value: 'UTC' },
+  { label: 'London', value: 'Europe/London' },
+  { label: 'Paris', value: 'Europe/Paris' },
+  { label: 'Berlin', value: 'Europe/Berlin' },
+  { label: 'Moscow', value: 'Europe/Moscow' },
+  { label: 'Dubai', value: 'Asia/Dubai' },
+  { label: 'Mumbai', value: 'Asia/Kolkata' },
+  { label: 'Dhaka', value: 'Asia/Dhaka' },
+  { label: 'Bangkok', value: 'Asia/Bangkok' },
+  { label: 'Singapore', value: 'Asia/Singapore' },
+  { label: 'Tokyo', value: 'Asia/Tokyo' },
+  { label: 'Seoul', value: 'Asia/Seoul' },
+  { label: 'Sydney', value: 'Australia/Sydney' },
+  { label: 'Auckland', value: 'Pacific/Auckland' },
   { label: 'New York', value: 'America/New_York' },
+  { label: 'Chicago', value: 'America/Chicago' },
+  { label: 'Denver', value: 'America/Denver' },
+  { label: 'Los Angeles', value: 'America/Los_Angeles' },
+  { label: 'Mexico City', value: 'America/Mexico_City' },
+  { label: 'Sao Paulo', value: 'America/Sao_Paulo' },
+  { label: 'Buenos Aires', value: 'America/Argentina/Buenos_Aires' },
 ] as const
 
 const BACKGROUNDS: Array<{ label: string; value: Background; image: string }> = [
@@ -38,6 +73,32 @@ const BACKGROUNDS: Array<{ label: string; value: Background; image: string }> = 
   { label: 'wallhaven-xedleo', value: 'wallhaven-xedleo', image: '/bgs/wallhaven-xedleo.jpg' },
   { label: 'wallhaven-yqg6r7', value: 'wallhaven-yqg6r7', image: '/bgs/wallhaven-yqg6r7.jpg' },
 ]
+
+const MONO_FONTS: Array<{ label: string; value: MonoFont; sample: string }> = [
+  { label: 'Adwaita Mono', value: 'adwaita', sample: '00:00:00' },
+  { label: 'IBM Plex Mono', value: 'ibm', sample: '00:00:00' },
+  { label: 'JetBrains Mono', value: 'jetbrains', sample: '00:00:00' },
+  { label: 'Source Code Pro', value: 'source', sample: '00:00:00' },
+]
+
+const RINGTONES: Array<{ label: string; value: Ringtone }> = [
+  { label: 'Chime', value: 'chime' },
+  { label: 'Bell', value: 'bell' },
+  { label: 'Alarm', value: 'alarm' },
+  { label: 'Long alarm', value: 'long-alarm' },
+  { label: 'Soft', value: 'soft' },
+  { label: 'Retro', value: 'retro' },
+  { label: 'Sonar', value: 'sonar' },
+  { label: 'Pulse', value: 'pulse' },
+  { label: 'Digital', value: 'digital' },
+]
+
+const normalizeToken = (value: string) => value.trim().toLowerCase()
+
+const findByLabelOrValue = <T extends { label: string; value: string }>(items: readonly T[], raw: string) => {
+  const normalized = normalizeToken(raw)
+  return items.find((item) => normalizeToken(item.value) === normalized || normalizeToken(item.label) === normalized)
+}
 
 const clockFormatter = (date: Date, timeZone: string, showSeconds: boolean, use24h: boolean) =>
   new Intl.DateTimeFormat('en-US', {
@@ -66,7 +127,7 @@ const formatDuration = (seconds: number, showHours = false) => {
   const secs = safe % 60
 
   if (showHours || hours > 0) {
-    return `${hours}:${pad2(minutes)}:${pad2(secs)}`
+    return `${pad2(hours)}:${pad2(minutes)}:${pad2(secs)}`
   }
 
   return `${minutes}:${pad2(secs)}`
@@ -77,10 +138,198 @@ const toBinaryRows = (digits: number[]) =>
     digits.map((digit) => (digit & bit ? '●' : '○')).join(' '),
   )
 
+const toSeconds = (hours: string, minutes: string, seconds: string) => {
+  const h = Number.parseInt(hours, 10)
+  const m = Number.parseInt(minutes, 10)
+  const s = Number.parseInt(seconds, 10)
+
+  const safeHours = Number.isFinite(h) && h >= 0 ? h : 0
+  const safeMinutes = Number.isFinite(m) && m >= 0 ? m : 0
+  const safeSeconds = Number.isFinite(s) && s >= 0 ? s : 0
+
+  return safeHours * 3600 + safeMinutes * 60 + safeSeconds
+}
+
+const getAudioContextClass = () =>
+  window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+
+const playTone = (
+  context: AudioContext,
+  frequency: number,
+  startTime: number,
+  duration: number,
+  volume: number,
+  type: OscillatorType = 'sine',
+) => {
+  const gain = context.createGain()
+  const oscillator = context.createOscillator()
+  oscillator.type = type
+  oscillator.frequency.value = frequency
+  oscillator.connect(gain)
+  gain.connect(context.destination)
+  gain.gain.setValueAtTime(0.0001, startTime)
+  gain.gain.exponentialRampToValueAtTime(volume, startTime + 0.02)
+  gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration)
+  oscillator.start(startTime)
+  oscillator.stop(startTime + duration + 0.03)
+}
+
+type ToneStep = {
+  frequency: number
+  at: number
+  duration: number
+  volume: number
+  type?: OscillatorType
+  spread?: number
+}
+
+const jitter = (value: number, spread = 0.02) => {
+  const amount = 1 + (Math.random() * 2 - 1) * spread
+  return value * amount
+}
+
+const playToneStep = (context: AudioContext, start: number, step: ToneStep) => {
+  playTone(
+    context,
+    jitter(step.frequency, step.spread ?? 0.02),
+    start + step.at,
+    step.duration,
+    jitter(step.volume, 0.08),
+    step.type ?? 'sine',
+  )
+}
+
+const RINGTONE_PATTERNS: Record<Ringtone, ToneStep[]> = {
+  chime: [
+    { at: 0, frequency: 784, duration: 0.28, volume: 0.18 },
+    { at: 0.28, frequency: 1046.5, duration: 0.32, volume: 0.16 },
+    { at: 0.64, frequency: 1567.98, duration: 0.3, volume: 0.14 },
+    { at: 1.02, frequency: 1046.5, duration: 0.34, volume: 0.15 },
+    { at: 1.46, frequency: 784, duration: 0.38, volume: 0.17 },
+    { at: 1.98, frequency: 1046.5, duration: 0.38, volume: 0.14 },
+    { at: 2.5, frequency: 1567.98, duration: 0.4, volume: 0.12 },
+  ],
+  bell: [
+    { at: 0, frequency: 659.25, duration: 0.38, volume: 0.18 },
+    { at: 0.34, frequency: 987.77, duration: 0.42, volume: 0.16 },
+    { at: 0.78, frequency: 1318.51, duration: 0.46, volume: 0.15 },
+    { at: 1.26, frequency: 987.77, duration: 0.48, volume: 0.16 },
+    { at: 1.8, frequency: 659.25, duration: 0.52, volume: 0.18 },
+    { at: 2.38, frequency: 987.77, duration: 0.48, volume: 0.15 },
+    { at: 2.92, frequency: 659.25, duration: 0.52, volume: 0.14 },
+  ],
+  alarm: [
+    { at: 0, frequency: 880, duration: 0.2, volume: 0.22, type: 'square', spread: 0.01 },
+    { at: 0.26, frequency: 880, duration: 0.2, volume: 0.22, type: 'square', spread: 0.01 },
+    { at: 0.52, frequency: 880, duration: 0.22, volume: 0.22, type: 'square', spread: 0.01 },
+    { at: 0.84, frequency: 880, duration: 0.22, volume: 0.22, type: 'square', spread: 0.01 },
+    { at: 1.16, frequency: 880, duration: 0.24, volume: 0.22, type: 'square', spread: 0.01 },
+    { at: 1.5, frequency: 880, duration: 0.24, volume: 0.22, type: 'square', spread: 0.01 },
+    { at: 1.84, frequency: 880, duration: 0.24, volume: 0.22, type: 'square', spread: 0.01 },
+    { at: 2.22, frequency: 880, duration: 0.24, volume: 0.22, type: 'square', spread: 0.01 },
+    { at: 2.62, frequency: 880, duration: 0.26, volume: 0.22, type: 'square', spread: 0.01 },
+    { at: 3.02, frequency: 880, duration: 0.26, volume: 0.22, type: 'square', spread: 0.01 },
+  ],
+  'long-alarm': [
+    { at: 0, frequency: 880, duration: 0.2, volume: 0.22, type: 'square', spread: 0.01 },
+    { at: 0.26, frequency: 784, duration: 0.22, volume: 0.2, type: 'square', spread: 0.01 },
+    { at: 0.54, frequency: 880, duration: 0.22, volume: 0.22, type: 'square', spread: 0.01 },
+    { at: 0.84, frequency: 784, duration: 0.24, volume: 0.2, type: 'square', spread: 0.01 },
+    { at: 1.16, frequency: 880, duration: 0.24, volume: 0.22, type: 'square', spread: 0.01 },
+    { at: 1.5, frequency: 659.25, duration: 0.28, volume: 0.18, type: 'square', spread: 0.01 },
+    { at: 1.86, frequency: 880, duration: 0.24, volume: 0.22, type: 'square', spread: 0.01 },
+    { at: 2.2, frequency: 784, duration: 0.26, volume: 0.2, type: 'square', spread: 0.01 },
+    { at: 2.56, frequency: 880, duration: 0.26, volume: 0.22, type: 'square', spread: 0.01 },
+    { at: 2.94, frequency: 659.25, duration: 0.3, volume: 0.18, type: 'square', spread: 0.01 },
+    { at: 3.36, frequency: 880, duration: 0.26, volume: 0.22, type: 'square', spread: 0.01 },
+    { at: 3.74, frequency: 784, duration: 0.28, volume: 0.2, type: 'square', spread: 0.01 },
+    { at: 4.14, frequency: 880, duration: 0.28, volume: 0.22, type: 'square', spread: 0.01 },
+    { at: 4.58, frequency: 659.25, duration: 0.34, volume: 0.18, type: 'square', spread: 0.01 },
+  ],
+  soft: [
+    { at: 0, frequency: 523.25, duration: 0.28, volume: 0.12 },
+    { at: 0.32, frequency: 659.25, duration: 0.3, volume: 0.11 },
+    { at: 0.7, frequency: 783.99, duration: 0.32, volume: 0.1 },
+    { at: 1.14, frequency: 659.25, duration: 0.34, volume: 0.11 },
+    { at: 1.64, frequency: 523.25, duration: 0.36, volume: 0.12 },
+    { at: 2.14, frequency: 659.25, duration: 0.38, volume: 0.1 },
+    { at: 2.68, frequency: 523.25, duration: 0.42, volume: 0.09 },
+  ],
+  retro: [
+    { at: 0, frequency: 440, duration: 0.16, volume: 0.18, type: 'square', spread: 0.02 },
+    { at: 0.2, frequency: 554.37, duration: 0.16, volume: 0.16, type: 'square', spread: 0.02 },
+    { at: 0.42, frequency: 659.25, duration: 0.18, volume: 0.14, type: 'square', spread: 0.02 },
+    { at: 0.68, frequency: 880, duration: 0.2, volume: 0.12, type: 'square', spread: 0.02 },
+    { at: 0.96, frequency: 659.25, duration: 0.18, volume: 0.14, type: 'square', spread: 0.02 },
+    { at: 1.22, frequency: 554.37, duration: 0.16, volume: 0.16, type: 'square', spread: 0.02 },
+    { at: 1.46, frequency: 440, duration: 0.18, volume: 0.18, type: 'square', spread: 0.02 },
+    { at: 1.76, frequency: 659.25, duration: 0.18, volume: 0.14, type: 'square', spread: 0.02 },
+    { at: 2.06, frequency: 880, duration: 0.22, volume: 0.12, type: 'square', spread: 0.02 },
+    { at: 2.38, frequency: 659.25, duration: 0.24, volume: 0.14, type: 'square', spread: 0.02 },
+  ],
+  sonar: [
+    { at: 0, frequency: 220, duration: 0.18, volume: 0.16 },
+    { at: 0.34, frequency: 330, duration: 0.22, volume: 0.14 },
+    { at: 0.72, frequency: 440, duration: 0.28, volume: 0.14 },
+    { at: 1.12, frequency: 330, duration: 0.24, volume: 0.12 },
+    { at: 1.5, frequency: 220, duration: 0.3, volume: 0.16 },
+    { at: 1.94, frequency: 440, duration: 0.36, volume: 0.14 },
+    { at: 2.42, frequency: 330, duration: 0.34, volume: 0.12 },
+  ],
+  pulse: [
+    { at: 0, frequency: 740, duration: 0.12, volume: 0.22, type: 'triangle', spread: 0.015 },
+    { at: 0.18, frequency: 740, duration: 0.12, volume: 0.22, type: 'triangle', spread: 0.015 },
+    { at: 0.36, frequency: 740, duration: 0.12, volume: 0.22, type: 'triangle', spread: 0.015 },
+    { at: 0.58, frequency: 740, duration: 0.14, volume: 0.22, type: 'triangle', spread: 0.015 },
+    { at: 0.8, frequency: 740, duration: 0.14, volume: 0.22, type: 'triangle', spread: 0.015 },
+    { at: 1.04, frequency: 740, duration: 0.14, volume: 0.22, type: 'triangle', spread: 0.015 },
+    { at: 1.28, frequency: 740, duration: 0.16, volume: 0.22, type: 'triangle', spread: 0.015 },
+    { at: 1.56, frequency: 740, duration: 0.16, volume: 0.22, type: 'triangle', spread: 0.015 },
+    { at: 1.84, frequency: 740, duration: 0.18, volume: 0.22, type: 'triangle', spread: 0.015 },
+  ],
+  digital: [
+    { at: 0, frequency: 988, duration: 0.12, volume: 0.16, type: 'square', spread: 0.015 },
+    { at: 0.14, frequency: 1318.51, duration: 0.12, volume: 0.14, type: 'square', spread: 0.015 },
+    { at: 0.28, frequency: 1567.98, duration: 0.12, volume: 0.12, type: 'square', spread: 0.015 },
+    { at: 0.46, frequency: 1318.51, duration: 0.12, volume: 0.14, type: 'square', spread: 0.015 },
+    { at: 0.64, frequency: 988, duration: 0.14, volume: 0.16, type: 'square', spread: 0.015 },
+    { at: 0.84, frequency: 1318.51, duration: 0.12, volume: 0.14, type: 'square', spread: 0.015 },
+    { at: 1.04, frequency: 1567.98, duration: 0.14, volume: 0.12, type: 'square', spread: 0.015 },
+    { at: 1.28, frequency: 1318.51, duration: 0.14, volume: 0.14, type: 'square', spread: 0.015 },
+    { at: 1.54, frequency: 988, duration: 0.16, volume: 0.16, type: 'square', spread: 0.015 },
+  ],
+}
+
+const playRingtone = async (ringtone: Ringtone) => {
+  const AudioContextClass = getAudioContextClass()
+  if (!AudioContextClass) return
+
+  const context = new AudioContextClass()
+  if (context.state === 'suspended') {
+    await context.resume().catch(() => {})
+  }
+
+  const start = context.currentTime + 0.02
+  const pattern = RINGTONE_PATTERNS[ringtone]
+  const closeDelay = Math.max(5000, Math.ceil((Math.max(...pattern.map((step) => step.at + step.duration)) + 1.1) * 1000))
+
+  pattern.forEach((step) => playToneStep(context, start, step))
+
+  window.setTimeout(() => {
+    context.close().catch(() => {})
+  }, closeDelay)
+}
+
 function App() {
   const [now, setNow] = useState(() => new Date())
-  const [mode, setMode] = useState<Mode>('clock')
-  const [view, setView] = useState<View>('digital')
+  const [mode, setMode] = useState<Mode>(() => {
+    const saved = window.localStorage.getItem('clock-mode')
+    return saved === 'clock' || saved === 'pomodoro' || saved === 'timer' || saved === 'stopwatch' ? saved : 'clock'
+  })
+  const [view, setView] = useState<View>(() => {
+    const saved = window.localStorage.getItem('clock-view')
+    return saved === 'digital' || saved === 'binary' ? saved : 'digital'
+  })
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = window.localStorage.getItem('clock-theme')
     if (saved === 'latte' || saved === 'mocha') return saved
@@ -90,22 +339,76 @@ function App() {
       ? 'latte'
       : 'mocha'
   })
+  const [monoFont, setMonoFont] = useState<MonoFont>(() => {
+    const saved = window.localStorage.getItem('clock-mono-font')
+    return MONO_FONTS.some((item) => item.value === saved) ? (saved as MonoFont) : 'adwaita'
+  })
   const [controlsOpen, setControlsOpen] = useState(false)
   const [background, setBackground] = useState<Background>(() => {
     const saved = window.localStorage.getItem('clock-background')
     return BACKGROUNDS.some((item) => item.value === saved) ? (saved as Background) : 'space'
   })
-  const [timeZone, setTimeZone] = useState<(typeof ZONES)[number]['value']>('Africa/Addis_Ababa')
-  const [showSeconds, setShowSeconds] = useState(true)
-  const [use24h, setUse24h] = useState(true)
+  const [timeZone, setTimeZone] = useState<(typeof ZONES)[number]['value']>(() => {
+    const saved = window.localStorage.getItem('clock-timezone')
+    return ZONES.some((zone) => zone.value === saved) ? (saved as (typeof ZONES)[number]['value']) : 'Africa/Addis_Ababa'
+  })
+  const [showSeconds, setShowSeconds] = useState(() => window.localStorage.getItem('clock-show-seconds') !== 'false')
+  const [use24h, setUse24h] = useState(() => window.localStorage.getItem('clock-use-24h') !== 'false')
+  const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
+    return window.localStorage.getItem('clock-notifications') === 'true'
+  })
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    const saved = window.localStorage.getItem('clock-sound')
+    return saved === null ? true : saved === 'true'
+  })
+  const [ringtone, setRingtone] = useState<Ringtone>(() => {
+    const saved = window.localStorage.getItem('clock-ringtone')
+    return RINGTONES.some((item) => item.value === saved) ? (saved as Ringtone) : 'chime'
+  })
 
-  const [timerInput, setTimerInput] = useState('15')
+  const [timerHoursInput, setTimerHoursInput] = useState(() => window.localStorage.getItem('clock-timer-hours') ?? '00')
+  const [timerMinutesInput, setTimerMinutesInput] = useState(() => window.localStorage.getItem('clock-timer-minutes') ?? '15')
+  const [timerSecondsInput, setTimerSecondsInput] = useState(() => window.localStorage.getItem('clock-timer-seconds') ?? '00')
   const [timerRunning, setTimerRunning] = useState(false)
   const [timerRemaining, setTimerRemaining] = useState(15 * 60)
   const [timerBase, setTimerBase] = useState(15 * 60)
 
+  const [pomodoroFocusInput, setPomodoroFocusInput] = useState(() => window.localStorage.getItem('clock-pomodoro-focus') ?? '25')
+  const [pomodoroBreakInput, setPomodoroBreakInput] = useState(() => window.localStorage.getItem('clock-pomodoro-break') ?? '5')
+  const [pomodoroPhase, setPomodoroPhase] = useState<PomodoroPhase>('focus')
+  const [pomodoroRunning, setPomodoroRunning] = useState(false)
+  const [pomodoroRemaining, setPomodoroRemaining] = useState(25 * 60)
+  const [pomodoroBase, setPomodoroBase] = useState(25 * 60)
+  const [pomodoroRounds, setPomodoroRounds] = useState(0)
+
   const [stopwatchRunning, setStopwatchRunning] = useState(false)
   const [stopwatchElapsed, setStopwatchElapsed] = useState(0)
+  const [statusMessage, setStatusMessage] = useState('')
+  const [paletteOpen, setPaletteOpen] = useState(false)
+  const [paletteValue, setPaletteValue] = useState('')
+  const statusTimeoutRef = useRef<number | null>(null)
+  const paletteInputRef = useRef<HTMLInputElement | null>(null)
+
+  const isTypingField = (target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) return false
+    return (
+      target.isContentEditable ||
+      target.tagName === 'INPUT' ||
+      target.tagName === 'TEXTAREA' ||
+      target.tagName === 'SELECT'
+    )
+  }
+
+  const flashStatus = (message: string) => {
+    setStatusMessage(message)
+    if (statusTimeoutRef.current !== null) {
+      window.clearTimeout(statusTimeoutRef.current)
+    }
+    statusTimeoutRef.current = window.setTimeout(() => {
+      setStatusMessage('')
+      statusTimeoutRef.current = null
+    }, 1800)
+  }
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(new Date()), 1000)
@@ -118,16 +421,197 @@ function App() {
   }, [theme])
 
   useEffect(() => {
+    window.localStorage.setItem('clock-mode', mode)
+  }, [mode])
+
+  useEffect(() => {
+    window.localStorage.setItem('clock-view', view)
+  }, [view])
+
+  useEffect(() => {
+    window.localStorage.setItem('clock-mono-font', monoFont)
+    document.documentElement.dataset.monoFont = monoFont
+  }, [monoFont])
+
+  useEffect(() => {
     window.localStorage.setItem('clock-background', background)
   }, [background])
 
   useEffect(() => {
+    window.localStorage.setItem('clock-timezone', timeZone)
+  }, [timeZone])
+
+  useEffect(() => {
+    window.localStorage.setItem('clock-show-seconds', String(showSeconds))
+  }, [showSeconds])
+
+  useEffect(() => {
+    window.localStorage.setItem('clock-use-24h', String(use24h))
+  }, [use24h])
+
+  useEffect(() => {
+    window.localStorage.setItem('clock-notifications', String(notificationsEnabled))
+  }, [notificationsEnabled])
+
+  useEffect(() => {
+    window.localStorage.setItem('clock-sound', String(soundEnabled))
+  }, [soundEnabled])
+
+  useEffect(() => {
+    window.localStorage.setItem('clock-ringtone', ringtone)
+  }, [ringtone])
+
+  useEffect(() => {
+    window.localStorage.setItem('clock-timer-hours', timerHoursInput)
+  }, [timerHoursInput])
+
+  useEffect(() => {
+    window.localStorage.setItem('clock-timer-minutes', timerMinutesInput)
+  }, [timerMinutesInput])
+
+  useEffect(() => {
+    window.localStorage.setItem('clock-timer-seconds', timerSecondsInput)
+  }, [timerSecondsInput])
+
+  useEffect(() => {
+    window.localStorage.setItem('clock-pomodoro-focus', pomodoroFocusInput)
+  }, [pomodoroFocusInput])
+
+  useEffect(() => {
+    window.localStorage.setItem('clock-pomodoro-break', pomodoroBreakInput)
+  }, [pomodoroBreakInput])
+
+  useEffect(() => {
+    return () => {
+      if (statusTimeoutRef.current !== null) {
+        window.clearTimeout(statusTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!paletteOpen) return
+    window.setTimeout(() => {
+      paletteInputRef.current?.focus()
+      paletteInputRef.current?.select()
+    }, 0)
+  }, [paletteOpen])
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!isTypingField(event.target) && !paletteOpen && (event.key === ':' || (event.code === 'Semicolon' && event.shiftKey))) {
+        event.preventDefault()
+        setPaletteValue('')
+        setPaletteOpen(true)
+        return
+      }
+
+      if (!isTypingField(event.target) && !paletteOpen && event.key.toLowerCase() === 'm') {
+        event.preventDefault()
+        setControlsOpen((value) => !value)
+        return
+      }
+
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        setPaletteOpen((value) => !value)
+        return
+      }
+
+      if (event.key === 'Escape' && paletteOpen) {
+        event.preventDefault()
+        setPaletteOpen(false)
+        setPaletteValue('')
+        return
+      }
+
+      if (event.code !== 'Space' || isTypingField(event.target)) {
+        return
+      }
+
+      if (mode === 'timer') {
+        event.preventDefault()
+        if (timerRunning) {
+          setTimerRunning(false)
+          flashStatus('paused')
+        } else if (timerRemaining <= 0) {
+          const total = toSeconds(timerHoursInput, timerMinutesInput, timerSecondsInput)
+          const safeTotal = total > 0 ? total : 60
+          setTimerBase(safeTotal)
+          setTimerRemaining(safeTotal)
+          setTimerRunning(true)
+          flashStatus('resumed')
+        } else {
+          setTimerRunning(true)
+          flashStatus('resumed')
+        }
+        return
+      }
+
+      if (mode === 'pomodoro') {
+        event.preventDefault()
+        if (pomodoroRunning) {
+          setPomodoroRunning(false)
+          flashStatus('paused')
+        } else if (pomodoroRemaining <= 0) {
+          startPomodoro()
+          flashStatus('resumed')
+        } else {
+          setPomodoroRunning(true)
+          flashStatus('resumed')
+        }
+        return
+      }
+
+      if (mode === 'stopwatch') {
+        event.preventDefault()
+        setStopwatchRunning((value) => {
+          const next = !value
+          flashStatus(next ? 'resumed' : 'paused')
+          return next
+        })
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [
+    mode,
+    paletteOpen,
+    pomodoroRemaining,
+    pomodoroRunning,
+    ringtone,
+    showSeconds,
+    soundEnabled,
+    timerHoursInput,
+    timerMinutesInput,
+    timerRemaining,
+    timerRunning,
+    timerSecondsInput,
+  ])
+
+  useEffect(() => {
     if (mode !== 'timer' || !timerRunning) return
+
+    const finishTimer = () => {
+      setTimerRunning(false)
+      setTimerRemaining(0)
+
+      if (soundEnabled) {
+        void playRingtone(ringtone)
+      }
+
+      if (notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
+        new Notification('Timer finished', {
+          body: 'Your countdown reached zero.',
+        })
+      }
+    }
 
     const interval = window.setInterval(() => {
       setTimerRemaining((value) => {
         if (value <= 1) {
-          setTimerRunning(false)
+          finishTimer()
           return 0
         }
 
@@ -136,7 +620,60 @@ function App() {
     }, 1000)
 
     return () => window.clearInterval(interval)
-  }, [mode, timerRunning])
+  }, [mode, notificationsEnabled, ringtone, soundEnabled, timerRunning])
+
+  useEffect(() => {
+    if (mode !== 'pomodoro' || !pomodoroRunning) return
+
+    const finishPomodoroPhase = async () => {
+      const nextPhase = pomodoroPhase === 'focus' ? 'break' : 'focus'
+      const nextMinutes =
+        pomodoroPhase === 'focus'
+          ? Number.parseInt(pomodoroBreakInput, 10)
+          : Number.parseInt(pomodoroFocusInput, 10)
+      const safeMinutes = Number.isFinite(nextMinutes) && nextMinutes > 0 ? nextMinutes : nextPhase === 'focus' ? 25 : 5
+      const total = safeMinutes * 60
+
+      setPomodoroPhase(nextPhase)
+      setPomodoroBase(total)
+      setPomodoroRemaining(total)
+      if (nextPhase === 'focus') {
+        setPomodoroRounds((value) => value + 1)
+      }
+
+      if (soundEnabled) {
+        await playRingtone(ringtone)
+      }
+
+      if (notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
+        new Notification(nextPhase === 'break' ? 'Pomodoro break' : 'Pomodoro focus', {
+          body: nextPhase === 'break' ? 'Time for a break.' : 'Back to focus.',
+        })
+      }
+    }
+
+    const interval = window.setInterval(() => {
+      setPomodoroRemaining((value) => {
+        if (value <= 1) {
+          void finishPomodoroPhase()
+          return 0
+        }
+
+        return value - 1
+      })
+    }, 1000)
+
+    return () => window.clearInterval(interval)
+  }, [
+    mode,
+    notificationsEnabled,
+    pomodoroBreakInput,
+    pomodoroFocusInput,
+    pomodoroPhase,
+    pomodoroRunning,
+    ringtone,
+    soundEnabled,
+  ])
 
   useEffect(() => {
     if (mode !== 'stopwatch' || !stopwatchRunning) return
@@ -153,6 +690,10 @@ function App() {
       return clockFormatter(now, timeZone, showSeconds, use24h)
     }
 
+    if (mode === 'pomodoro') {
+      return formatDuration(pomodoroRemaining, true)
+    }
+
     if (mode === 'timer') {
       return formatDuration(timerRemaining, true)
     }
@@ -163,6 +704,10 @@ function App() {
   const detailValue = useMemo(() => {
     if (mode === 'clock') {
       return dateFormatter(now, timeZone)
+    }
+
+    if (mode === 'pomodoro') {
+      return `${pomodoroPhase === 'focus' ? 'focus' : 'break'} • round ${pomodoroRounds + 1}`
     }
 
     if (mode === 'timer') {
@@ -176,10 +721,17 @@ function App() {
     const source =
       mode === 'clock'
         ? clockFormatter(now, timeZone, true, true).replace(/[^0-9]/g, '').slice(0, 6)
-        : formatDuration(mode === 'timer' ? timerRemaining : stopwatchElapsed, true).replace(/[^0-9]/g, '').padStart(6, '0').slice(-6)
+        : formatDuration(
+            mode === 'pomodoro'
+              ? pomodoroRemaining
+              : mode === 'timer'
+                ? timerRemaining
+                : stopwatchElapsed,
+            true,
+          ).replace(/[^0-9]/g, '').padStart(6, '0').slice(-6)
 
     return source.split('').map((digit) => Number.parseInt(digit, 10))
-  }, [mode, now, stopwatchElapsed, timerRemaining, timeZone])
+  }, [mode, now, pomodoroRemaining, stopwatchElapsed, timerRemaining, timeZone])
 
   const binaryRows = useMemo(() => toBinaryRows(binaryDigits), [binaryDigits])
 
@@ -188,33 +740,239 @@ function App() {
     return ((timerBase - timerRemaining) / timerBase) * 100
   }, [timerBase, timerRemaining])
 
+  const pomodoroProgress = useMemo(() => {
+    if (pomodoroBase <= 0) return 0
+    return ((pomodoroBase - pomodoroRemaining) / pomodoroBase) * 100
+  }, [pomodoroBase, pomodoroRemaining])
+
   const startTimer = () => {
-    const minutes = Number.parseInt(timerInput, 10)
-    const safeMinutes = Number.isFinite(minutes) && minutes > 0 ? minutes : 1
-    const total = safeMinutes * 60
-    setTimerBase(total)
-    setTimerRemaining(total)
+    const total = toSeconds(timerHoursInput, timerMinutesInput, timerSecondsInput)
+    const safeTotal = total > 0 ? total : 60
+    setTimerBase(safeTotal)
+    setTimerRemaining(safeTotal)
     setTimerRunning(true)
     setMode('timer')
   }
 
+  const toggleTimer = () => {
+    setMode('timer')
+    if (timerRunning) {
+      setTimerRunning(false)
+      flashStatus('paused')
+      return
+    }
+
+    if (timerRemaining <= 0) {
+      startTimer()
+      flashStatus('resumed')
+      return
+    }
+
+    setTimerRunning(true)
+    flashStatus('resumed')
+  }
+
   const resetTimer = () => {
-    const minutes = Number.parseInt(timerInput, 10)
-    const safeMinutes = Number.isFinite(minutes) && minutes > 0 ? minutes : 1
-    const total = safeMinutes * 60
-    setTimerBase(total)
-    setTimerRemaining(total)
+    const total = toSeconds(timerHoursInput, timerMinutesInput, timerSecondsInput)
+    const safeTotal = total > 0 ? total : 60
+    setTimerBase(safeTotal)
+    setTimerRemaining(safeTotal)
     setTimerRunning(false)
   }
 
-  const startStopwatch = () => {
-    setStopwatchRunning(true)
+  const startPomodoro = () => {
+    const minutes = Number.parseInt(pomodoroFocusInput, 10)
+    const safeMinutes = Number.isFinite(minutes) && minutes > 0 ? minutes : 25
+    const total = safeMinutes * 60
+    setPomodoroPhase('focus')
+    setPomodoroBase(total)
+    setPomodoroRemaining(total)
+    setPomodoroRunning(true)
+    setMode('pomodoro')
+  }
+
+  const togglePomodoro = () => {
+    setMode('pomodoro')
+    if (pomodoroRunning) {
+      setPomodoroRunning(false)
+      flashStatus('paused')
+      return
+    }
+
+    if (pomodoroRemaining <= 0) {
+      startPomodoro()
+      flashStatus('resumed')
+      return
+    }
+
+    setPomodoroRunning(true)
+    flashStatus('resumed')
+  }
+
+  const resetPomodoro = () => {
+    const minutes = Number.parseInt(pomodoroFocusInput, 10)
+    const safeMinutes = Number.isFinite(minutes) && minutes > 0 ? minutes : 25
+    const total = safeMinutes * 60
+    setPomodoroPhase('focus')
+    setPomodoroBase(total)
+    setPomodoroRemaining(total)
+    setPomodoroRunning(false)
+    setPomodoroRounds(0)
+  }
+
+  const toggleNotifications = async () => {
+    if (!('Notification' in window)) {
+      return
+    }
+
+    if (notificationsEnabled) {
+      setNotificationsEnabled(false)
+      return
+    }
+
+    if (Notification.permission === 'granted') {
+      setNotificationsEnabled(true)
+      return
+    }
+
+    if (Notification.permission === 'default') {
+      const permission = await Notification.requestPermission()
+      if (permission === 'granted') {
+        setNotificationsEnabled(true)
+      }
+    }
+  }
+
+  const toggleStopwatch = () => {
     setMode('stopwatch')
+    setStopwatchRunning((value) => {
+      const next = !value
+      flashStatus(next ? 'resumed' : 'paused')
+      return next
+    })
   }
 
   const resetStopwatch = () => {
     setStopwatchRunning(false)
     setStopwatchElapsed(0)
+  }
+
+  const previewRingtone = (value: Ringtone) => {
+    void playRingtone(value)
+  }
+
+  const runPaletteCommand = (rawValue: string) => {
+    const text = normalizeToken(rawValue)
+    if (!text) return
+
+    const [command, ...args] = text.split(/\s+/)
+    const rest = args.join(' ')
+
+    if (command === 'clock') {
+      setMode('clock')
+      return
+    }
+
+    if (command === 'timer') {
+      const total = (() => {
+        if (rest.includes(':')) {
+          const parts = rest.split(':').map((piece) => Number.parseInt(piece, 10))
+          if (parts.some((part) => !Number.isFinite(part))) return NaN
+          if (parts.length === 3) return toSeconds(String(parts[0]), String(parts[1]), String(parts[2]))
+          if (parts.length === 2) return toSeconds('0', String(parts[0]), String(parts[1]))
+          return NaN
+        }
+
+        return Number.parseInt(rest, 10) * 60
+      })()
+      const safeTotal = Number.isFinite(total) && total > 0 ? total : 25 * 60
+      setTimerHoursInput(String(Math.floor(safeTotal / 3600)).padStart(2, '0'))
+      setTimerMinutesInput(String(Math.floor((safeTotal % 3600) / 60)).padStart(2, '0'))
+      setTimerSecondsInput(String(safeTotal % 60).padStart(2, '0'))
+      setTimerBase(safeTotal)
+      setTimerRemaining(safeTotal)
+      setTimerRunning(true)
+      setMode('timer')
+      flashStatus('resumed')
+      return
+    }
+
+    if (command === 'pomodoro') {
+      const focus = Number.parseInt(args[0] ?? pomodoroFocusInput, 10)
+      const breakMinutes = Number.parseInt(args[1] ?? pomodoroBreakInput, 10)
+      const safeFocus = Number.isFinite(focus) && focus > 0 ? focus : 25
+      const safeBreak = Number.isFinite(breakMinutes) && breakMinutes > 0 ? breakMinutes : 5
+      const total = safeFocus * 60
+      setPomodoroFocusInput(String(safeFocus))
+      setPomodoroBreakInput(String(safeBreak))
+      setPomodoroPhase('focus')
+      setPomodoroBase(total)
+      setPomodoroRemaining(total)
+      setPomodoroRunning(true)
+      setPomodoroRounds(0)
+      setMode('pomodoro')
+      flashStatus('resumed')
+      return
+    }
+
+    if (command === 'stopwatch') {
+      setMode('stopwatch')
+      setStopwatchRunning(true)
+      flashStatus('resumed')
+      return
+    }
+
+    if (command === 'theme') {
+      if (rest === 'latte' || rest === 'mocha') setTheme(rest)
+      return
+    }
+
+    if (command === 'view') {
+      if (rest === 'digital' || rest === 'binary') setView(rest)
+      return
+    }
+
+    if (command === 'sound') {
+      if (rest === 'on') setSoundEnabled(true)
+      if (rest === 'off') setSoundEnabled(false)
+      return
+    }
+
+    if (command === 'notif' || command === 'notifications') {
+      if (rest === 'on') setNotificationsEnabled(true)
+      if (rest === 'off') setNotificationsEnabled(false)
+      return
+    }
+
+    if (command === 'bg' || command === 'background') {
+      const picked = findByLabelOrValue(BACKGROUNDS, rest)
+      if (picked) setBackground(picked.value)
+      return
+    }
+
+    if (command === 'font') {
+      const picked = findByLabelOrValue(MONO_FONTS, rest)
+      if (picked) setMonoFont(picked.value)
+      return
+    }
+
+    if (command === 'zone' || command === 'timezone') {
+      const picked = findByLabelOrValue(ZONES, rest)
+      if (picked) setTimeZone(picked.value)
+      return
+    }
+
+    if (command === 'ringtone' || command === 'soundset') {
+      const picked = findByLabelOrValue(RINGTONES, rest)
+      if (picked) setRingtone(picked.value)
+      return
+    }
+  }
+
+  const submitPalette = () => {
+    runPaletteCommand(paletteValue)
+    setPaletteValue('')
+    setPaletteOpen(false)
   }
 
   return (
@@ -230,6 +988,12 @@ function App() {
           <div className="display__stack">
             <div className="display__value">{displayValue}</div>
             <div className="display__detail">{detailValue}</div>
+            {statusMessage && <div className="display__status">{statusMessage}</div>}
+            {(mode === 'timer' || mode === 'pomodoro' || mode === 'stopwatch') && (
+              <div className="display__hint">
+                press <kbd>space</kbd> to pause/resume
+              </div>
+            )}
           </div>
         )}
 
@@ -261,6 +1025,19 @@ function App() {
         )}
       </section>
 
+      {view === 'binary' && (
+        <div className="display__note">
+          {(mode === 'timer' || mode === 'pomodoro' || mode === 'stopwatch') && (
+            <>
+              {statusMessage && <div className="display__status">{statusMessage}</div>}
+              <div className="display__hint">
+                press <kbd>space</kbd> to pause/resume
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       <button type="button" className="menu-fab" onClick={() => setControlsOpen((value) => !value)}>
         {controlsOpen ? 'hide' : 'menu'}
       </button>
@@ -283,11 +1060,32 @@ function App() {
           <button type="button" onClick={() => setUse24h((value) => !value)}>
             24h {use24h ? 'on' : 'off'}
           </button>
+          <button type="button" onClick={toggleNotifications}>
+            notif {notificationsEnabled ? 'on' : 'off'}
+          </button>
+          <button type="button" onClick={() => setSoundEnabled((value) => !value)}>
+            sound {soundEnabled ? 'on' : 'off'}
+          </button>
         </div>
+
+        <div className="section-label">Font</div>
+        <label className="field">
+          <span>mono font</span>
+          <select value={monoFont} onChange={(event) => setMonoFont(event.target.value as MonoFont)}>
+            {MONO_FONTS.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+          <small className="field-note">
+            Preview: {MONO_FONTS.find((item) => item.value === monoFont)?.sample}
+          </small>
+        </label>
 
         <div className="section-label">Modes</div>
         <div className="segment">
-          {(['clock', 'timer', 'stopwatch'] as const).map((item) => (
+          {(['clock', 'pomodoro', 'timer', 'stopwatch'] as const).map((item) => (
             <button
               key={item}
               type="button"
@@ -299,26 +1097,95 @@ function App() {
           ))}
         </div>
 
-        {mode === 'timer' && (
+        {mode === 'pomodoro' && (
           <div className="mini-controls">
             <label className="field">
-              <span>minutes</span>
+              <span>focus min</span>
               <input
                 type="number"
                 min="1"
-                max="600"
-                value={timerInput}
-                onChange={(event) => setTimerInput(event.target.value)}
+                max="240"
+                value={pomodoroFocusInput}
+                onChange={(event) => setPomodoroFocusInput(event.target.value)}
+              />
+            </label>
+            <label className="field">
+              <span>break min</span>
+              <input
+                type="number"
+                min="1"
+                max="120"
+                value={pomodoroBreakInput}
+                onChange={(event) => setPomodoroBreakInput(event.target.value)}
               />
             </label>
             <div className="timer-actions">
-              <button type="button" onClick={timerRunning ? () => setTimerRunning(false) : startTimer}>
+              <button type="button" onClick={togglePomodoro}>
+                {pomodoroRunning ? 'pause' : 'start'}
+              </button>
+              <button type="button" onClick={resetPomodoro}>
+                reset
+              </button>
+              <span className="progress">{Math.round(pomodoroProgress)}%</span>
+            </div>
+          </div>
+        )}
+
+        {mode === 'timer' && (
+          <div className="mini-controls">
+            <div className="duration-grid">
+              <label className="field">
+                <span>hours</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="99"
+                  value={timerHoursInput}
+                  onChange={(event) => setTimerHoursInput(event.target.value)}
+                />
+              </label>
+              <label className="field">
+                <span>minutes</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="59"
+                  value={timerMinutesInput}
+                  onChange={(event) => setTimerMinutesInput(event.target.value)}
+                />
+              </label>
+              <label className="field">
+                <span>seconds</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="59"
+                  value={timerSecondsInput}
+                  onChange={(event) => setTimerSecondsInput(event.target.value)}
+                />
+              </label>
+            </div>
+            <div className="timer-actions">
+              <button type="button" onClick={toggleTimer}>
                 {timerRunning ? 'pause' : 'start'}
               </button>
               <button type="button" onClick={resetTimer}>
                 reset
               </button>
               <span className="progress">{Math.round(timerProgress)}%</span>
+            </div>
+          </div>
+        )}
+
+        {mode === 'stopwatch' && (
+          <div className="mini-controls">
+            <div className="timer-actions">
+              <button type="button" onClick={toggleStopwatch}>
+                {stopwatchRunning ? 'pause' : 'start'}
+              </button>
+              <button type="button" onClick={resetStopwatch}>
+                reset
+              </button>
             </div>
           </div>
         )}
@@ -348,6 +1215,23 @@ function App() {
           </select>
         </label>
 
+        <div className="section-label">Sound</div>
+        <label className="field">
+          <span>ringtone</span>
+          <select value={ringtone} onChange={(event) => setRingtone(event.target.value as Ringtone)}>
+            {RINGTONES.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+          <div className="field-actions">
+            <button type="button" className="ringtone-preview" onClick={() => previewRingtone(ringtone)}>
+              Preview sound
+            </button>
+          </div>
+        </label>
+
         <div className="background-picker" aria-label="background presets">
           {BACKGROUNDS.map((item) => (
             <button
@@ -362,20 +1246,36 @@ function App() {
             </button>
           ))}
         </div>
-
-        {mode === 'stopwatch' && (
-          <div className="mini-controls">
-            <div className="timer-actions">
-              <button type="button" onClick={stopwatchRunning ? () => setStopwatchRunning(false) : startStopwatch}>
-                {stopwatchRunning ? 'pause' : 'start'}
-              </button>
-              <button type="button" onClick={resetStopwatch}>
-                reset
-              </button>
-            </div>
-          </div>
-        )}
       </section>
+
+      {paletteOpen && (
+        <div className="commandline" aria-label="Command mode">
+          <label className="commandline__line">
+            <span className="commandline__prompt">:</span>
+            <input
+              ref={paletteInputRef}
+              className="commandline__input"
+              value={paletteValue}
+              onChange={(event) => setPaletteValue(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  submitPalette()
+                }
+                if (event.key === 'Escape') {
+                  event.preventDefault()
+                  setPaletteOpen(false)
+                  setPaletteValue('')
+                }
+              }}
+              placeholder="timer 25, bg space, theme mocha, font ibm"
+            />
+          </label>
+          <div className="commandline__help">
+            enter to run · esc to close · press <kbd>:</kbd> to open
+          </div>
+        </div>
+      )}
     </main>
   )
 }
