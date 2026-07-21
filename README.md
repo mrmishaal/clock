@@ -1,32 +1,57 @@
-# React + TypeScript + Vite
+# clock.mrmishaal.org
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A simple clock app with timers, Pomodoro, stopwatch, wallpapers, and Catppuccin styling.
 
-Currently, two official plugins are available:
+## How to use it
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Press `m` to open or close the menu.
+- Press `:` to open command mode at the bottom.
+- Press `Space` to pause or resume the timer, Pomodoro, or stopwatch.
+- Press `Esc` to close command mode.
 
-## React Compiler
+## Main features
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- live clock
+- countdown timer
+- Pomodoro mode
+- stopwatch
+- multiple timezones
+- wallpaper picker
+- Catppuccin light and dark themes
+- mono font selector
+- sound selector
+- notifications for finished timers
 
-## Expanding the Oxlint configuration
+## Useful commands
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+In command mode, you can type:
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+- `clock` — go back to the clock
+- `timer 25` — start a 25 minute timer
+- `timer 1:00:00` — start a timer with hours, minutes, and seconds
+- `pomodoro 25 5` — start a Pomodoro session
+- `stopwatch` — start the stopwatch
+- `theme mocha` or `theme latte`
+- `view digital` or `view binary`
+- `bg space`
+- `font ibm`
+- `zone Addis Ababa`
+- `ringtone bell`
+
+## Running locally
+
+```bash
+npm install
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+To build for production:
+
+```bash
+npm run build
+```
+
+## Note
+
+The app remembers your last settings in the browser, so it should feel the same the next time you open it.
+

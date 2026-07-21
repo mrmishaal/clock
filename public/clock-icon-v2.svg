@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Clock icon">
+  <rect width="64" height="64" rx="16" fill="#1e1e2e"/>
+  <circle cx="32" cy="32" r="22" fill="#313244" stroke="#cba6f7" stroke-width="3"/>
+  <circle cx="32" cy="32" r="3.5" fill="#f5e0dc"/>
+  <path d="M32 18v15l10 6" fill="none" stroke="#89b4fa" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M22 10l4 6M42 10l-4 6M10 22l6 4M48 22l6-4" stroke="#6c7086" stroke-width="3" stroke-linecap="round"/>
+</svg>
