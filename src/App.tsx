@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
+import Worker from './worker?worker'
 
 type Mode = 'clock' | 'pomodoro' | 'timer' | 'stopwatch'
 type View = 'digital' | 'binary'
@@ -388,6 +389,7 @@ function App() {
   const [paletteValue, setPaletteValue] = useState('')
   const statusTimeoutRef = useRef<number | null>(null)
   const paletteInputRef = useRef<HTMLInputElement | null>(null)
+  const workerRef = useRef<Worker | null>(null)
 
   const isTypingField = (target: EventTarget | null) => {
     if (!(target instanceof HTMLElement)) return false
@@ -497,6 +499,98 @@ function App() {
     }, 0)
   }, [paletteOpen])
 
+  const startTimer = useCallback(() => {
+    const total = toSeconds(timerHoursInput, timerMinutesInput, timerSecondsInput)
+    const safeTotal = total > 0 ? total : 60
+    setTimerBase(safeTotal)
+    setTimerRemaining(safeTotal)
+    setTimerRunning(true)
+    setMode('timer')
+    workerRef.current?.postMessage({ type: 'start', mode: 'timer', payload: { remaining: safeTotal } })
+  }, [timerHoursInput, timerMinutesInput, timerSecondsInput])
+
+  const toggleTimer = useCallback(() => {
+    setMode('timer')
+    if (timerRunning) {
+      setTimerRunning(false)
+      flashStatus('paused')
+      workerRef.current?.postMessage({ type: 'stop', mode: 'timer' })
+      return
+    }
+
+    if (timerRemaining <= 0) {
+      startTimer()
+      flashStatus('resumed')
+      return
+    }
+
+    setTimerRunning(true)
+    flashStatus('resumed')
+    workerRef.current?.postMessage({ type: 'start', mode: 'timer', payload: { remaining: timerRemaining } })
+  }, [timerRunning, timerRemaining, startTimer])
+  
+  const startPomodoro = useCallback(() => {
+    const minutes = Number.parseInt(pomodoroFocusInput, 10)
+    const safeMinutes = Number.isFinite(minutes) && minutes > 0 ? minutes : 25
+    const total = safeMinutes * 60
+    setPomodoroPhase('focus')
+    setPomodoroBase(total)
+    setPomodoroRemaining(total)
+    setPomodoroRunning(true)
+    setMode('pomodoro')
+    workerRef.current?.postMessage({
+      type: 'start',
+      mode: 'pomodoro',
+      payload: {
+        focus: total,
+        break: Number.parseInt(pomodoroBreakInput, 10) * 60,
+        phase: 'focus',
+      },
+    })
+  }, [pomodoroFocusInput, pomodoroBreakInput])
+
+  const togglePomodoro = useCallback(() => {
+    setMode('pomodoro')
+    if (pomodoroRunning) {
+      setPomodoroRunning(false)
+      flashStatus('paused')
+      workerRef.current?.postMessage({ type: 'stop', mode: 'pomodoro' })
+      return
+    }
+
+    if (pomodoroRemaining <= 0) {
+      startPomodoro()
+      flashStatus('resumed')
+      return
+    }
+
+    setPomodoroRunning(true)
+    flashStatus('resumed')
+    workerRef.current?.postMessage({
+        type: 'start',
+        mode: 'pomodoro',
+        payload: {
+            focus: Number.parseInt(pomodoroFocusInput, 10) * 60,
+            break: Number.parseInt(pomodoroBreakInput, 10) * 60,
+            phase: pomodoroPhase,
+        },
+    })
+  }, [pomodoroRunning, pomodoroRemaining, startPomodoro, pomodoroFocusInput, pomodoroBreakInput, pomodoroPhase])
+
+  const toggleStopwatch = useCallback(() => {
+    setMode('stopwatch')
+    setStopwatchRunning((value) => {
+      const next = !value
+      if (next) {
+        workerRef.current?.postMessage({ type: 'start', mode: 'stopwatch' })
+      } else {
+        workerRef.current?.postMessage({ type: 'stop', mode: 'stopwatch' })
+      }
+      flashStatus(next ? 'resumed' : 'paused')
+      return next
+    })
+  }, [])
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!isTypingField(event.target) && !paletteOpen && (event.key === ':' || (event.code === 'Semicolon' && event.shiftKey))) {
@@ -531,159 +625,109 @@ function App() {
 
       if (mode === 'timer') {
         event.preventDefault()
-        if (timerRunning) {
-          setTimerRunning(false)
-          flashStatus('paused')
-        } else if (timerRemaining <= 0) {
-          const total = toSeconds(timerHoursInput, timerMinutesInput, timerSecondsInput)
-          const safeTotal = total > 0 ? total : 60
-          setTimerBase(safeTotal)
-          setTimerRemaining(safeTotal)
-          setTimerRunning(true)
-          flashStatus('resumed')
-        } else {
-          setTimerRunning(true)
-          flashStatus('resumed')
-        }
+        toggleTimer()
         return
       }
 
       if (mode === 'pomodoro') {
         event.preventDefault()
-        if (pomodoroRunning) {
-          setPomodoroRunning(false)
-          flashStatus('paused')
-        } else if (pomodoroRemaining <= 0) {
-          startPomodoro()
-          flashStatus('resumed')
-        } else {
-          setPomodoroRunning(true)
-          flashStatus('resumed')
-        }
+        togglePomodoro()
         return
       }
 
       if (mode === 'stopwatch') {
         event.preventDefault()
-        setStopwatchRunning((value) => {
-          const next = !value
-          flashStatus(next ? 'resumed' : 'paused')
-          return next
-        })
+        toggleStopwatch()
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [
-    mode,
-    paletteOpen,
-    pomodoroRemaining,
-    pomodoroRunning,
-    ringtone,
-    showSeconds,
-    soundEnabled,
-    timerHoursInput,
-    timerMinutesInput,
-    timerRemaining,
-    timerRunning,
-    timerSecondsInput,
-  ])
+  }, [mode, paletteOpen, toggleTimer, togglePomodoro, toggleStopwatch])
 
-  useEffect(() => {
-    if (mode !== 'timer' || !timerRunning) return
+  const finishTimer = useCallback(() => {
+    setTimerRunning(false)
+    setTimerRemaining(0)
 
-    const finishTimer = () => {
-      setTimerRunning(false)
-      setTimerRemaining(0)
-
-      if (soundEnabled) {
-        void playRingtone(ringtone)
-      }
-
-      if (notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
-        new Notification('Timer finished', {
-          body: 'Your countdown reached zero.',
-        })
-      }
+    if (soundEnabled) {
+      void playRingtone(ringtone)
     }
 
-    const interval = window.setInterval(() => {
-      setTimerRemaining((value) => {
-        if (value <= 1) {
+    if (notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
+      new Notification('Timer finished', {
+        body: 'Your countdown reached zero.',
+      })
+    }
+  }, [soundEnabled, ringtone, notificationsEnabled])
+
+  const finishPomodoroPhase = useCallback(async (nextPhase: 'focus' | 'break') => {
+    const nextMinutes =
+      nextPhase === 'break'
+        ? Number.parseInt(pomodoroBreakInput, 10)
+        : Number.parseInt(pomodoroFocusInput, 10)
+    const safeMinutes = Number.isFinite(nextMinutes) && nextMinutes > 0 ? nextMinutes : nextPhase === 'focus' ? 25 : 5
+    const total = safeMinutes * 60
+
+    setPomodoroPhase(nextPhase)
+    setPomodoroBase(total)
+    setPomodoroRemaining(total)
+    if (nextPhase === 'focus') {
+      setPomodoroRounds((value) => value + 1)
+    }
+
+    if (soundEnabled) {
+      await playRingtone(ringtone)
+    }
+
+    if (notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
+      new Notification(nextPhase === 'break' ? 'Pomodoro break' : 'Pomodoro focus', {
+        body: nextPhase === 'break' ? 'Time for a break.' : 'Back to focus.',
+      })
+    }
+    
+    if (pomodoroRunning) {
+        workerRef.current?.postMessage({
+            type: 'start',
+            mode: 'pomodoro',
+            payload: {
+                focus: Number.parseInt(pomodoroFocusInput, 10) * 60,
+                break: Number.parseInt(pomodoroBreakInput, 10) * 60,
+                phase: nextPhase,
+            },
+        })
+    }
+  }, [pomodoroBreakInput, pomodoroFocusInput, soundEnabled, ringtone, notificationsEnabled, pomodoroRunning])
+
+  useEffect(() => {
+    workerRef.current = new Worker()
+
+    workerRef.current.onmessage = (
+      event: MessageEvent<{ type: string; mode: string; value: number; nextPhase?: 'focus' | 'break' }>,
+    ) => {
+      const { type, mode, value, nextPhase } = event.data
+      if (type === 'tick') {
+        if (mode === 'timer') {
+          setTimerRemaining(value)
+        } else if (mode === 'pomodoro') {
+          setPomodoroRemaining(value)
+        } else if (mode === 'stopwatch') {
+          setStopwatchElapsed(value)
+        }
+      } else if (type === 'finish') {
+        if (mode === 'timer') {
           finishTimer()
-          return 0
+        } else if (mode === 'pomodoro' && nextPhase) {
+          finishPomodoroPhase(nextPhase)
         }
-
-        return value - 1
-      })
-    }, 1000)
-
-    return () => window.clearInterval(interval)
-  }, [mode, notificationsEnabled, ringtone, soundEnabled, timerRunning])
-
-  useEffect(() => {
-    if (mode !== 'pomodoro' || !pomodoroRunning) return
-
-    const finishPomodoroPhase = async () => {
-      const nextPhase = pomodoroPhase === 'focus' ? 'break' : 'focus'
-      const nextMinutes =
-        pomodoroPhase === 'focus'
-          ? Number.parseInt(pomodoroBreakInput, 10)
-          : Number.parseInt(pomodoroFocusInput, 10)
-      const safeMinutes = Number.isFinite(nextMinutes) && nextMinutes > 0 ? nextMinutes : nextPhase === 'focus' ? 25 : 5
-      const total = safeMinutes * 60
-
-      setPomodoroPhase(nextPhase)
-      setPomodoroBase(total)
-      setPomodoroRemaining(total)
-      if (nextPhase === 'focus') {
-        setPomodoroRounds((value) => value + 1)
-      }
-
-      if (soundEnabled) {
-        await playRingtone(ringtone)
-      }
-
-      if (notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
-        new Notification(nextPhase === 'break' ? 'Pomodoro break' : 'Pomodoro focus', {
-          body: nextPhase === 'break' ? 'Time for a break.' : 'Back to focus.',
-        })
       }
     }
 
-    const interval = window.setInterval(() => {
-      setPomodoroRemaining((value) => {
-        if (value <= 1) {
-          void finishPomodoroPhase()
-          return 0
-        }
+    return () => {
+      workerRef.current?.terminate()
+    }
+  }, [finishPomodoroPhase, finishTimer])
 
-        return value - 1
-      })
-    }, 1000)
 
-    return () => window.clearInterval(interval)
-  }, [
-    mode,
-    notificationsEnabled,
-    pomodoroBreakInput,
-    pomodoroFocusInput,
-    pomodoroPhase,
-    pomodoroRunning,
-    ringtone,
-    soundEnabled,
-  ])
-
-  useEffect(() => {
-    if (mode !== 'stopwatch' || !stopwatchRunning) return
-
-    const interval = window.setInterval(() => {
-      setStopwatchElapsed((value) => value + 1)
-    }, 1000)
-
-    return () => window.clearInterval(interval)
-  }, [mode, stopwatchRunning])
 
   const displayValue = useMemo(() => {
     if (mode === 'clock') {
@@ -715,7 +759,7 @@ function App() {
     }
 
     return stopwatchRunning ? 'recording' : 'idle'
-  }, [mode, now, stopwatchRunning, timerRunning, timeZone])
+  }, [mode, now, timeZone, pomodoroPhase, pomodoroRounds, timerRunning, stopwatchRunning])
 
   const binaryDigits = useMemo(() => {
     const source =
@@ -731,7 +775,7 @@ function App() {
           ).replace(/[^0-9]/g, '').padStart(6, '0').slice(-6)
 
     return source.split('').map((digit) => Number.parseInt(digit, 10))
-  }, [mode, now, pomodoroRemaining, stopwatchElapsed, timerRemaining, timeZone])
+  }, [mode, now, timeZone, pomodoroRemaining, timerRemaining, stopwatchElapsed])
 
   const binaryRows = useMemo(() => toBinaryRows(binaryDigits), [binaryDigits])
 
@@ -744,69 +788,14 @@ function App() {
     if (pomodoroBase <= 0) return 0
     return ((pomodoroBase - pomodoroRemaining) / pomodoroBase) * 100
   }, [pomodoroBase, pomodoroRemaining])
-
-  const startTimer = () => {
-    const total = toSeconds(timerHoursInput, timerMinutesInput, timerSecondsInput)
-    const safeTotal = total > 0 ? total : 60
-    setTimerBase(safeTotal)
-    setTimerRemaining(safeTotal)
-    setTimerRunning(true)
-    setMode('timer')
-  }
-
-  const toggleTimer = () => {
-    setMode('timer')
-    if (timerRunning) {
-      setTimerRunning(false)
-      flashStatus('paused')
-      return
-    }
-
-    if (timerRemaining <= 0) {
-      startTimer()
-      flashStatus('resumed')
-      return
-    }
-
-    setTimerRunning(true)
-    flashStatus('resumed')
-  }
-
+  
   const resetTimer = () => {
     const total = toSeconds(timerHoursInput, timerMinutesInput, timerSecondsInput)
     const safeTotal = total > 0 ? total : 60
     setTimerBase(safeTotal)
     setTimerRemaining(safeTotal)
     setTimerRunning(false)
-  }
-
-  const startPomodoro = () => {
-    const minutes = Number.parseInt(pomodoroFocusInput, 10)
-    const safeMinutes = Number.isFinite(minutes) && minutes > 0 ? minutes : 25
-    const total = safeMinutes * 60
-    setPomodoroPhase('focus')
-    setPomodoroBase(total)
-    setPomodoroRemaining(total)
-    setPomodoroRunning(true)
-    setMode('pomodoro')
-  }
-
-  const togglePomodoro = () => {
-    setMode('pomodoro')
-    if (pomodoroRunning) {
-      setPomodoroRunning(false)
-      flashStatus('paused')
-      return
-    }
-
-    if (pomodoroRemaining <= 0) {
-      startPomodoro()
-      flashStatus('resumed')
-      return
-    }
-
-    setPomodoroRunning(true)
-    flashStatus('resumed')
+    workerRef.current?.postMessage({ type: 'reset', mode: 'timer', payload: { base: safeTotal } })
   }
 
   const resetPomodoro = () => {
@@ -818,6 +807,7 @@ function App() {
     setPomodoroRemaining(total)
     setPomodoroRunning(false)
     setPomodoroRounds(0)
+    workerRef.current?.postMessage({ type: 'reset', mode: 'pomodoro', payload: { base: total } })
   }
 
   const toggleNotifications = async () => {
@@ -842,19 +832,11 @@ function App() {
       }
     }
   }
-
-  const toggleStopwatch = () => {
-    setMode('stopwatch')
-    setStopwatchRunning((value) => {
-      const next = !value
-      flashStatus(next ? 'resumed' : 'paused')
-      return next
-    })
-  }
-
+  
   const resetStopwatch = () => {
     setStopwatchRunning(false)
     setStopwatchElapsed(0)
+    workerRef.current?.postMessage({ type: 'reset', mode: 'stopwatch' })
   }
 
   const previewRingtone = (value: Ringtone) => {
@@ -893,6 +875,7 @@ function App() {
       setTimerRemaining(safeTotal)
       setTimerRunning(true)
       setMode('timer')
+      workerRef.current?.postMessage({ type: 'start', mode: 'timer', payload: { remaining: safeTotal } })
       flashStatus('resumed')
       return
     }
@@ -911,13 +894,25 @@ function App() {
       setPomodoroRunning(true)
       setPomodoroRounds(0)
       setMode('pomodoro')
+      workerRef.current?.postMessage({
+        type: 'start',
+        mode: 'pomodoro',
+        payload: {
+          focus: total,
+          break: safeBreak * 60,
+          phase: 'focus',
+        },
+      })
       flashStatus('resumed')
       return
     }
 
     if (command === 'stopwatch') {
       setMode('stopwatch')
+      setStopwatchElapsed(0)
       setStopwatchRunning(true)
+      workerRef.current?.postMessage({ type: 'reset', mode: 'stopwatch' })
+      workerRef.current?.postMessage({ type: 'start', mode: 'stopwatch' })
       flashStatus('resumed')
       return
     }
